@@ -27,11 +27,13 @@ Analysis can include:
 
 ### Libraries
 
-- steem.js local copy usage
-- Bootstrap for easy webpage creation
-- jQuery, a dependency of Bootstrap, but use local non-CDN version
-- D3js and maybe C3js for charts
-- Loading animations from [loading.css](https://github.com/ConnorAtherton/loaders.css)
+All libraries as local copy
+
+- [steemit javascript](https://github.com/steemit/javascript), AKA steem.js (not yet used), - MIT license, license file missing from repo
+- [Bootstrap](http://getbootstrap.com/) for easy webpage creation
+- [jQuery](https://github.com/jquery/jquery), as Bootstrap dependency
+- [D3js](https://github.com/d3/d3) for charts (not yet used)
+- [loading.css](https://github.com/ConnorAtherton/loaders.css) for loading animations
 
 Note there doesn't need to be any login for this, just type in a username
 
