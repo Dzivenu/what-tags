@@ -7,6 +7,7 @@ var followers = [];
 var followersTags = [];
 var followersTagsTop5 = {};
 var allTags = {};
+var allTagsArray = [];
 var tagsTop5 = {};
 
 function begin() {
@@ -59,6 +60,7 @@ function beginWithSpecifiedUser() {
         // finish
         removeLoadingDiv();
         addToElement("header_info", "<p>Done, analysis complete.</p>");
+        createGraphs();
       });
     }
   });
@@ -111,6 +113,10 @@ function generateAllTags() {
     }
   }
   console.log(JSON.stringify(allTags));
+  allTagsArray = [];
+  for (var tag in allTags) {
+    allTagsArray.push({name: tag, freq: allTags[tag]});
+  }
 }
 
 function getFollowersTags_recursive(index, callback) {
@@ -178,12 +184,77 @@ function getTagsUsedByUser(username, callback) {
   });
 }
 
+// -- GRAPHING
+
+function createGraphs() {
+  createAllTagsGraph();
+}
+
+// modified from example at https://bl.ocks.org/mbostock/4063269
+//    fixed by http://stackoverflow.com/a/39377170/781729
+//    and https://jsfiddle.net/r24e8xd7/9/
+function createAllTagsGraph() {
+  var dataset = {children: allTagsArray};
+  addDivWithHtml("all_tags_graph", "<p>All tags</p>", "chart1");
+
+  var diameter = 1000, //max size of the bubbles
+    color    = d3.scaleOrdinal(d3.schemeCategory20c); //color category
+
+  var bubble = d3.pack(dataset)
+    .size([diameter, diameter])
+    .padding(1.5);
+
+  var svg = d3.select(".chart1")
+    .append("svg")
+    .attr("width", diameter)
+    .attr("height", diameter)
+    .attr("class", "bubble");
+
+  //bubbles needs very specific format, convert data to this.
+  var nodes = d3.hierarchy(dataset)
+    .sum(function(d) { return d.freq; });
+
+  var node = svg.selectAll(".node")
+    .data(bubble(nodes).descendants())
+    .enter()
+    .filter(function(d){
+      return  !d.children
+    })
+    .append("g")
+    .attr("class", "node")
+    .attr("transform", function(d) {
+      return "translate(" + d.x + "," + d.y + ")";
+    });
+
+  node.append("title")
+    .text(function(d) {
+      return d.name + ": " + d.freq;
+    });
+
+  node.append("circle")
+    .attr("r", function(d) {
+      return d.r;
+    })
+    .style("fill", function(d) {
+      return color(d.name);
+    });
+
+  node.append("text")
+    .attr("dy", ".3em")
+    .style("text-anchor", "middle")
+    .text(function(d) {
+      return d.r > 30 ? d.data.name : ""; // + ": " + d.data.freq
+    });
+
+  d3.select(self.frameElement)
+    .style("height", diameter + "px");
+}
 
 // -- UTILS
 
-function addDivWithHtml(id, html) {
+function addDivWithHtml(id, html, _class) {
   var container = window.document.getElementById('main_container');
-  container.innerHTML += "<div class=\"jumbotron\" id=\""+id+"\">"+html+"</div>";
+  container.innerHTML += "<div class=\"jumbotron"+(_class != null ? " "+_class : "")+"\" id=\""+id+"\">"+html+"</div>";
 }
 
 function addToElement(id, html) {
