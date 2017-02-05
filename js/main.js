@@ -1,6 +1,6 @@
 
-const
-  NUM_POSTS_TO_SCRAPE = 50;
+var
+  NUM_POSTS_TO_SCRAPE = 10;
 
 var username = "";
 var followers = [];
@@ -12,8 +12,18 @@ var tagsTop5 = {};
 
 function begin() {
   var inputUsername = window.document.getElementById('input_username');
+  var inputPostsToScrape = window.document.getElementById('input_posts_to_scrape');
   if (inputUsername) {
     username = inputUsername.value;
+    if (inputPostsToScrape && inputPostsToScrape.value.length > 0) {
+      NUM_POSTS_TO_SCRAPE = Number(inputPostsToScrape.value);
+    }
+    if (NUM_POSTS_TO_SCRAPE < 1) {
+      addErrorDiv("<p>Posts to scrape cannot be less than 1!</p>");
+    } else if (NUM_POSTS_TO_SCRAPE > 100) {
+      addErrorDiv("<p>Posts to scrape cannot be more than 100!</p>");
+    }
+    removeDiv('form_div');
     beginWithSpecifiedUser();
   }
 }
@@ -33,20 +43,20 @@ function beginWithSpecifiedUser() {
   getFollowers(username, function(err, followersResult) {
     removeLoadingDiv();
     if (err || followersResult == null) {
-      addToElement("error_info", "<h3>There has been an error</h3><p>"+err.message+"</p>");
+      addErrorDiv("<h3>There has been an error</h3><p>"+err.message+"</p>");
       return;
     }
     // else
-    addLoadingDiv("Scrapping tags from up to last "+NUM_POSTS_TO_SCRAPE+" posts of followers, this can take a while...");
     addToElement("header_info", "<p>Number of followers: "+followers.length + (followersResult.max  ? " or more (fetch limit reached)" : "") +"</p>");
     if (followers.length > 0) {
+      addLoadingDiv("Scrapping tags from up to last "+NUM_POSTS_TO_SCRAPE+" posts of followers, this can take a while...");
       // get each followers tags
       followersTags = [];
       addToElement("header_info", "<p id=\"p_followers\">Followers processed so far: 0</p>");
       getFollowersTags_recursive(0, function (err, getFollowersTagsResult) {
         removeLoadingDiv();
         if (err || getFollowersTagsResult == null) {
-          addToElement("error_info", "<p>Error getting tags from user: "+followers[index]+"</p>"
+          addErrorDiv("<p>Error getting tags from user: "+followers[index]+"</p>"
             +"<p>Processed stopped, please submit a bug report to the <a href=\"https://github.com/Steem-FOSSbot/what-tags/issues\">What Tag issue tracker</a></p>"
             +(err ? "<p>with the following error:</p><p>"+err.message+"</p>" : ""));
           return;
@@ -55,13 +65,15 @@ function beginWithSpecifiedUser() {
         addLoadingDiv("Analysing statistics...");
         // generate stats
         generateAllTags();
-        tagsTop5 = generateTop5(allTags);
+        generateAllTop5Tags();
         generateFollowersTop5();
         // finish
         removeLoadingDiv();
         addToElement("header_info", "<p>Done, analysis complete.</p>");
         createGraphs();
       });
+    } else {
+      addErrorDiv("<p>No followers!</p>");
     }
   });
 }
@@ -71,15 +83,41 @@ function generateFollowersTop5() {
   for (var userTags in followersTags) {
     followersTagsTop5[followersTags[userTags].username] = generateTop5(followersTags[userTags].tags);
   }
-  console.log(JSON.stringify(followersTagsTop5));
+}
+
+function generateAllTop5Tags() {
+  if (allTags == null) {
+    return;
+  }
+  var orderedTop5TagNames = [null, null, null, null, null];
+  var orderedTop5TagValues = [0, 0, 0, 0, 0];
+  for (var tag in allTags) {
+    for (var i = 0 ; i < 5 ; i++) {
+      if (allTags[tag].freq > orderedTop5TagValues[i]) {
+        // shuffle down
+        for (var j = 4 ; j > i ; j--) {
+          orderedTop5TagNames[j] = orderedTop5TagNames[j-1];
+          orderedTop5TagValues[j] = orderedTop5TagValues[j-1];
+        }
+        orderedTop5TagNames[i] = tag;
+        orderedTop5TagValues[i] = allTags[tag].freq;
+        break;
+      }
+    }
+  }
+  tagsTop5 = {};
+  for (var i = 0 ; i < 5 ; i++) {
+    tagsTop5[orderedTop5TagNames[i]] = orderedTop5TagValues[i];
+  }
+  console.log("top 5 tags: "+JSON.stringify(tagsTop5));
 }
 
 function generateTop5(tags) {
   if (tags == null) {
     return;
   }
-  orderedTop5TagNames = [null, null, null, null, null];
-  orderedTop5TagValues = [0, 0, 0, 0, 0];
+  var orderedTop5TagNames = [null, null, null, null, null];
+  var orderedTop5TagValues = [0, 0, 0, 0, 0];
   for (var tag in tags) {
     for (var i = 0 ; i < 5 ; i++) {
       if (tags[tag] > orderedTop5TagValues[i]) {
@@ -106,16 +144,20 @@ function generateAllTags() {
   for (var userTags in followersTags) {
     for (var tag in followersTags[userTags].tags) {
       if (allTags.hasOwnProperty(tag)) {
-        allTags[tag] += followersTags[userTags].tags[tag];
+        allTags[tag].freq += followersTags[userTags].tags[tag];
+        allTags[tag].usernames.push(followersTags[userTags].username);
       } else {
-        allTags[tag] = followersTags[userTags].tags[tag];
+        allTags[tag] = {
+          freq: followersTags[userTags].tags[tag],
+          usernames: [followersTags[userTags].username]
+        };
       }
     }
   }
-  console.log(JSON.stringify(allTags));
+  //console.log(JSON.stringify(allTags));
   allTagsArray = [];
   for (var tag in allTags) {
-    allTagsArray.push({name: tag, freq: allTags[tag]});
+    allTagsArray.push({name: tag, freq: allTags[tag].freq, usernames: allTags[tag].usernames});
   }
 }
 
@@ -187,7 +229,16 @@ function getTagsUsedByUser(username, callback) {
 // -- GRAPHING
 
 function createGraphs() {
+  createTop5Graph();
   createAllTagsGraph();
+}
+
+function createTop5Graph() {
+  var html_text = "<h3>Top 5 tags</h3><br/>";
+  for (var tag in tagsTop5) {
+    html_text += "<p><strong>" + tag + "</strong> used " + tagsTop5[tag] + " times</p>";
+  }
+  addDivWithHtml("top_5_tags_text", html_text);
 }
 
 // modified from example at https://bl.ocks.org/mbostock/4063269
@@ -195,10 +246,22 @@ function createGraphs() {
 //    and https://jsfiddle.net/r24e8xd7/9/
 function createAllTagsGraph() {
   var dataset = {children: allTagsArray};
-  addDivWithHtml("all_tags_graph", "<p>All tags</p>", "chart1");
+  addDivWithHtml("all_tags_graph", "<h3>Total tag usage</h3>"
+    + "<p>Size indicates tag usage in total</p>"
+    + "<p>Color indicates tag usage by users (bluer = more users use tag)</p>", "chart1");
 
-  var diameter = 1000, //max size of the bubbles
-    color    = d3.scaleOrdinal(d3.schemeCategory20c); //color category
+  var maxUsersForSingleTag = 0;
+  for (var i = 0 ; i < allTagsArray.length ; i++) {
+    if (allTagsArray[i].usernames.length > maxUsersForSingleTag) {
+      maxUsersForSingleTag = allTagsArray[i].usernames.length;
+    }
+  }
+
+  var diameter = 800; //max size of the bubblesv
+  //var color    = d3.scaleOrdinal(d3.schemeCategory20c); //color category
+  var color = d3.scaleLinear()
+    .domain([1, maxUsersForSingleTag])
+    .range(["pink", "steelblue"]);
 
   var bubble = d3.pack(dataset)
     .size([diameter, diameter])
@@ -228,7 +291,7 @@ function createAllTagsGraph() {
 
   node.append("title")
     .text(function(d) {
-      return d.name + ": " + d.freq;
+      return "tag \"" + d.data.name + "\" used " + d.data.freq + " times by " + d.data.usernames.length + " users";
     });
 
   node.append("circle")
@@ -236,7 +299,7 @@ function createAllTagsGraph() {
       return d.r;
     })
     .style("fill", function(d) {
-      return color(d.name);
+      return color(d.data.usernames.length);
     });
 
   node.append("text")
@@ -277,12 +340,21 @@ function modifyElement(id, html) {
 
 function addLoadingDiv(title) {
   var container = window.document.getElementById('main_container');
-  container.innerHTML +=  "<div class=\"jumbotron jumbotron_col\" id=\"loading_div\"><p>"+title+"</p><div class=\"loader-inner ball-grid-pulse\"><div></div>"
+  container.innerHTML +=  "<div class=\"jumbotron jumbotron_blue\" id=\"loading_div\"><p>"+title+"</p><div class=\"loader-inner ball-grid-pulse\"><div></div>"
     +"<div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><br/><br/><br/></div></div>";
 }
 
-function removeLoadingDiv() {
-  if (document.getElementById('loading_div')) {
-    document.getElementById('loading_div').remove();
+function addErrorDiv(html) {
+  var container = window.document.getElementById('main_container');
+  container.innerHTML += "<div class=\"jumbotron jumbotron_red\" id=\"error_div\">"+html+"</div>";
+}
+
+function removeDiv(id) {
+  if (document.getElementById(id)) {
+    document.getElementById(id).remove();
   }
+}
+
+function removeLoadingDiv() {
+  removeDiv('loading_div');
 }
