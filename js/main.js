@@ -1,6 +1,10 @@
 
+const
+  FOLLOWERS_FETCH_LIMIT = 400;
+
 var
-  NUM_POSTS_TO_SCRAPE = 10;
+  NUM_POSTS_TO_SCRAPE = 10,
+  NUM_TOP_TAGS_FOR_GRAPHING = 2;
 
 var username = "";
 var followers = [];
@@ -10,11 +14,25 @@ var allTags = {};
 var allTagsArray = [];
 var tagsTop5 = {};
 
+document.getElementById('input_username').onkeypress = function(e){
+  if (!e) e = window.event;
+  var keyCode = e.keyCode || e.which;
+  if (keyCode == '13'){
+    begin();
+    return false;
+  }
+};
+
 function begin() {
   var inputUsername = window.document.getElementById('input_username');
   var inputPostsToScrape = window.document.getElementById('input_posts_to_scrape');
+  var inputNumTopTagsToGraph = window.document.getElementById('input_num_top_tags_to_graph');
   if (inputUsername) {
     username = inputUsername.value;
+    if (username.length < 1) {
+      return;
+    }
+    //NUM_POSTS_TO_SCRAPE
     if (inputPostsToScrape && inputPostsToScrape.value.length > 0) {
       NUM_POSTS_TO_SCRAPE = Number(inputPostsToScrape.value);
     }
@@ -23,6 +41,15 @@ function begin() {
     } else if (NUM_POSTS_TO_SCRAPE > 100) {
       addErrorDiv("<p>Posts to scrape cannot be more than 100!</p>");
     }
+    //NUM_TOP_TAGS_FOR_GRAPHING
+    if (inputNumTopTagsToGraph && inputNumTopTagsToGraph.value.length > 0) {
+      NUM_TOP_TAGS_FOR_GRAPHING = Number(inputNumTopTagsToGraph.value);
+    }
+    if (NUM_TOP_TAGS_FOR_GRAPHING < 1) {
+      addErrorDiv("<p>Num top tags to graph cannot be less than 1!</p>");
+    } else if (NUM_TOP_TAGS_FOR_GRAPHING > 5) {
+      addErrorDiv("<p>Num top tags to graph cannot be more than 100!</p>");
+    }
     removeDiv('form_div');
     beginWithSpecifiedUser();
   }
@@ -30,9 +57,6 @@ function begin() {
 
 function beginWithSpecifiedUser() {
   // clean username
-  if (username == null || username.length < 1) {
-    alert('username error!');
-  }
   if (username[0].localeCompare('@') == 0) {
     username = username.substr(1, username.length - 1);
   }
@@ -47,7 +71,7 @@ function beginWithSpecifiedUser() {
       return;
     }
     // else
-    addToElement("header_info", "<p>Number of followers: "+followers.length + (followersResult.max  ? " or more (fetch limit reached)" : "") +"</p>");
+    addToElement("header_info", "<p>Number of followers: "+followers.length + (followersResult.max  ? " or more (fetch limit of "+FOLLOWERS_FETCH_LIMIT+" reached)" : "") +"</p>");
     if (followers.length > 0) {
       addLoadingDiv("Scrapping tags from up to last "+NUM_POSTS_TO_SCRAPE+" posts of followers, this can take a while...");
       // get each followers tags
@@ -64,13 +88,18 @@ function beginWithSpecifiedUser() {
         addToElement("header_info", "<p>Almost there!</p>");
         addLoadingDiv("Analysing statistics...");
         // generate stats
+        console.log("generateAllTags");
         generateAllTags();
+        console.log("generateAllTop5Tags");
         generateAllTop5Tags();
+        console.log("generateFollowersTop5");
         generateFollowersTop5();
         // finish
         removeLoadingDiv();
         addToElement("header_info", "<p>Done, analysis complete.</p>");
+        console.log("createGraphs");
         createGraphs();
+        console.log("DONE");
       });
     } else {
       addErrorDiv("<p>No followers!</p>");
@@ -83,6 +112,7 @@ function generateFollowersTop5() {
   for (var userTags in followersTags) {
     followersTagsTop5[followersTags[userTags].username] = generateTop5(followersTags[userTags].tags);
   }
+  //console.log("followersTagsTop5 = "+JSON.stringify(followersTagsTop5));
 }
 
 function generateAllTop5Tags() {
@@ -105,11 +135,11 @@ function generateAllTop5Tags() {
       }
     }
   }
-  tagsTop5 = {};
-  for (var i = 0 ; i < 5 ; i++) {
-    tagsTop5[orderedTop5TagNames[i]] = orderedTop5TagValues[i];
-  }
-  console.log("top 5 tags: "+JSON.stringify(tagsTop5));
+  tagsTop5 = {
+    tags: orderedTop5TagNames,
+    freqs: orderedTop5TagValues
+  };
+  //console.log("top 5 tags: "+JSON.stringify(tagsTop5));
 }
 
 function generateTop5(tags) {
@@ -132,10 +162,10 @@ function generateTop5(tags) {
       }
     }
   }
-  var top5 = {};
-  for (var i = 0 ; i < 5 ; i++) {
-    top5[orderedTop5TagNames[i]] = orderedTop5TagValues[i];
-  }
+  var top5 = {
+    tags: orderedTop5TagNames,
+    freqs: orderedTop5TagValues
+  };
   return top5;
 }
 
@@ -176,6 +206,7 @@ function getFollowersTags_recursive(index, callback) {
       tags: tagsResult
     });
     if ((index + 1) >= followers.length) {
+      modifyElement("p_followers", "Followers processed so far: "+followers.length);
       callback(null, true);
     } else {
       getFollowersTags_recursive(index + 1, callback);
@@ -185,7 +216,7 @@ function getFollowersTags_recursive(index, callback) {
 }
 
 function getFollowers(username, callback) {
-  steem.api.getFollowers(username, 0, null, 1000, function(err, followersResult) {
+  steem.api.getFollowers(username, 0, null, FOLLOWERS_FETCH_LIMIT, function(err, followersResult) {
     if (err || followersResult == null) {
       callback({message: "error: "+(err != null ? err.message + ", " + JSON.stringify(err.payload) : "null result")}, null);
     }
@@ -194,7 +225,7 @@ function getFollowers(username, callback) {
         followers.push(followersResult[i].follower);
       }
     }
-    callback(null, {max: followersResult.length == 1000});
+    callback(null, {max: followersResult.length == FOLLOWERS_FETCH_LIMIT});
   });
 }
 
@@ -229,14 +260,18 @@ function getTagsUsedByUser(username, callback) {
 // -- GRAPHING
 
 function createGraphs() {
+  console.log("createTop5Graph");
   createTop5Graph();
+  console.log("createAllTagsGraph");
   createAllTagsGraph();
+  console.log("createAllAuthorsGraph");
+  createAllAuthorsGraph();
 }
 
 function createTop5Graph() {
   var html_text = "<h3>Top 5 tags</h3><br/>";
-  for (var tag in tagsTop5) {
-    html_text += "<p><strong>" + tag + "</strong> used " + tagsTop5[tag] + " times</p>";
+  for (var i = 0 ; i < 5 ; i++) {
+    html_text += "<p><strong>" + tagsTop5.tags[i] + "</strong> used " + tagsTop5.freqs[i] + " times</p>";
   }
   addDivWithHtml("top_5_tags_text", html_text);
 }
@@ -311,6 +346,245 @@ function createAllTagsGraph() {
 
   d3.select(self.frameElement)
     .style("height", diameter + "px");
+}
+
+// modified from example at https://bl.ocks.org/mbostock/4062045
+function createAllAuthorsGraph() {
+  addDivWithHtml("all_authors_top_tag_graph", "<h3>Authors using same top tag</h3>"
+    + "<p>Shows connections between authors who use at least one of the same of their top "+NUM_TOP_TAGS_FOR_GRAPHING+" most used tags</p>"
+    + "<p>Not shown are authors who are off on their own don't share any top "+NUM_TOP_TAGS_FOR_GRAPHING+" tags with the other followers</p>"
+    + "<br/><p>Mouse over a dot for information about that author. You can also drag dots.</p>"
+    , "chart2");
+
+  var width = 1000,
+    height = 800;
+
+  var svg = d3.select(".chart2")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  //allTagsArray.push({name: tag, freq: allTags[tag].freq, usernames: allTags[tag].usernames});
+
+  var createNodes = function(_links) {
+    var _nodes = [];
+    for (var i = 0 ; i < followers.length ; i++) {
+      var linked = false;
+      for (var j = 0 ; j < _links.length ; j++) {
+        if (_links[j].source.localeCompare(followers[i]) == 0
+            || _links[j].target.localeCompare(followers[i]) == 0) {
+          linked = true;
+        }
+      }
+      if (linked) {
+        _nodes.push({
+          id: followers[i],
+          group: 1
+        });
+      }
+    }
+    return _nodes;
+  };
+
+  var maxLinkSources = 0;
+
+  var createLinksTopTagOnly = function() {
+    var _links = [];
+    //console.log("createLinks");
+    for (var usr1 in followersTagsTop5) {
+      //console.log(" - usr1: "+usr1);
+      var topTag1 = "";
+      var topTag1Freq = 0;
+      for(var tag1 in followersTagsTop5[usr1]) {
+        if (followersTagsTop5[usr1][tag1] > topTag1Freq) {
+          topTag1Freq = followersTagsTop5[usr1][tag1];
+          topTag1 = tag1;
+        }
+      }
+      //console.log(" - - tag1 "+(c++)+": "+tag1);
+      for (var usr2 in followersTagsTop5) {
+        //console.log(" - - - usr2: "+usr2);
+        if (usr1.localeCompare(usr2) != 0) {
+          var topTag2 = "";
+          var topTag2Freq = 0;
+          for (var tag2 in followersTagsTop5[usr2]) {
+            if (followersTagsTop5[usr2][tag2] > topTag2Freq) {
+              topTag2Freq = followersTagsTop5[usr2][tag2];
+              topTag2 = tag2;
+            }
+          }
+          //console.log(" - - - - tag2: "+tag2);
+          if (topTag1.localeCompare(topTag2) == 0) {
+            //console.log(" - - - - - MATCH!");
+
+            var existingLinkIdx = -1;
+            for (var k = 0 ; k < _links.length ; k++) {
+              if ((_links[k].source.localeCompare(usr1) == 0 && _links[k].target.localeCompare(usr2) == 0)
+              //  || (_links[k].source.localeCompare(usr2) == 0 && _links[k].target.localeCompare(usr1) == 0)
+              ) {
+                existingLinkIdx = k;
+                break;
+              }
+            }
+            if (existingLinkIdx >= 0) {
+              _links[existingLinkIdx].value++;
+            } else {
+              _links.push({
+                source: usr1,
+                target: usr2,
+                value: 1
+              });
+            }
+            break;
+          }
+        }
+      }
+    }
+    return _links;
+  };
+
+  var createLinksTopTags = function() {
+    var _links = [];
+    //console.log("createLinks");
+    for (var usr1 in followersTagsTop5) {
+      //console.log(" - usr1: "+usr1);
+      for(var i = 0 ; i < NUM_TOP_TAGS_FOR_GRAPHING ; i++) {
+        var tag1 = followersTagsTop5[usr1].tags[i];
+        if (tag1 && tag1.localeCompare("null") != 0) {
+          //console.log(" - - tag1 "+(c++)+": "+tag1);
+          for (var usr2 in followersTagsTop5) {
+            //console.log(" - - - usr2: "+usr2);
+            if (usr1.localeCompare(usr2) != 0) {
+              for(var j = 0 ; j < NUM_TOP_TAGS_FOR_GRAPHING ; j++) {
+                var tag2 = followersTagsTop5[usr2].tags[j];
+                if (tag2 && tag2.localeCompare("null") != 0) {
+                  //console.log(" - - - - tag2: "+tag2);
+                  if (tag1.localeCompare(tag2) == 0) {
+                    //console.log(" - - - - - MATCH!");
+                    var existingLinkIdx = -1;
+                    for (var k = 0 ; k < _links.length ; k++) {
+                      if ((_links[k].source.localeCompare(usr1) == 0 && _links[k].target.localeCompare(usr2) == 0)
+                        || (_links[k].source.localeCompare(usr2) == 0 && _links[k].target.localeCompare(usr1) == 0)) {
+                        existingLinkIdx = k;
+                        break;
+                      }
+                    }
+                    if (existingLinkIdx >= 0) {
+                      _links[existingLinkIdx].value++;
+                    } else {
+                      _links.push({
+                        source: usr1,
+                        target: usr2,
+                        value: 1
+                      });
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return _links;
+  };
+
+  var links = createLinksTopTags(); //createLinksTopTagOnly();
+  var nodes = createNodes(links);
+
+  var graph = {
+    nodes: nodes,
+    links: links
+  };
+
+  //console.log("graph = "+JSON.stringify(graph));
+
+  for (var i = 0 ; i < graph.links.length ; i++) {
+    if (graph.links[i].value > maxLinkSources) {
+      maxLinkSources = graph.links[i].value;
+    }
+  }
+
+  var colorLinks = d3.scaleLinear()
+    .domain([1, maxLinkSources])
+    .range(["#D9D9D9", "steelblue"]);
+
+  var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("charge", d3.forceManyBody().strength(-100).distanceMax(300))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  //graph is object
+  var link = svg.append("g")
+    .attr("class", "links")
+    .selectAll("line")
+    .data(graph.links)
+    .enter().append("line")
+    .attr("stroke", function(d) { return colorLinks(d.value); }) //Math.sqrt(d.value)
+    .attr("stroke-width", function(d) { return 1; }); //Math.sqrt(d.value)   Math.pow(d.value, 2)
+
+  var node = svg.append("g")
+    .attr("class", "nodes")
+    .selectAll("circle")
+    .data(graph.nodes)
+    .enter().append("circle")
+    .attr("r", 5)
+    .attr("fill", function(d) { return d.group == 1 ? "orange" : "yellow"; })
+      .attr("stroke", function(d) { return "gray"; })
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended))
+      ;
+
+  node.append("title")
+    .text(function(d) {
+      var str = "";
+      for (var i = 0 ; i < NUM_TOP_TAGS_FOR_GRAPHING ; i++) {
+        str += followersTagsTop5[d.id].tags[i] + (i != (NUM_TOP_TAGS_FOR_GRAPHING - 1) ? ", " : "");
+      }
+      return d.id + " using top "+NUM_TOP_TAGS_FOR_GRAPHING+" tags " + str;
+    });
+
+  node.append("title")
+    .text(function(d) { return d.id; });
+
+  simulation
+    .nodes(graph.nodes)
+    .on("tick", ticked);
+
+  simulation.force("link")
+    .links(graph.links);
+
+  function ticked() {
+    link
+      .attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+
+    node
+      .attr("cx", function(d) { return d.x; })
+      .attr("cy", function(d) { return d.y; });
+  }
+
+  function dragstarted(d) {
+    if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(d) {
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+  }
+
+  function dragended(d) {
+    if (!d3.event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
 }
 
 // -- UTILS

@@ -47,24 +47,34 @@
 
     <div class="container">
 
-      <div class="row row-offcanvas row-offcanvas-right">
+      <div class="row row-offcanvas row-offcanvas-right" id="main_container_container">
 
         <div class="col-xs-12 col-sm-12" id="main_container">
           <div class="jumbotron jumbotron_blue" id="form_div">
             <p>What user's tag network would you like to look at?</p>
             <div class="row">
-              <div class="col-xs-2 col-sm-2">
-                <input class="form_spacing" type="text" name="username" id="input_username" placeholder="@username" required autofocus>
-              </div>
               <div class="col-xs-4 col-sm-4">
-                <p><a class="btn btn-primary" href="javascript:begin()" role="button">Begin</a></p>
+                <input class="form_spacing" type="text" name="username" id="input_username" placeholder="@username" required autofocus>
               </div>
             </div>
             <div class="row">
               <div class="col-xs-4 col-sm-4">
+                <br/><br/>
                 <p>Advanced settings</p>
-                <label for="input_posts_to_scrape">Posts to scrape</label>
                 <input class="form_spacing" type="number" step="1" name="posts_to_scrape" id="input_posts_to_scrape" placeholder="10">
+                <label for="input_posts_to_scrape">Posts to scrape</label>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-xs-12 col-sm-12">
+                <input class="form_spacing" type="number" step="1" name="num_top_tags_to_graph" id="input_num_top_tags_to_graph" placeholder="2">
+                <label for="input_num_top_tags_to_graph">Num top tags to graph (max 5)</label>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-xs-4 col-sm-4">
+                <br/><br/>
+                <p><a class="btn btn-primary" href="javascript:begin()" role="button">Begin</a></p>
               </div>
             </div>
           </div>
