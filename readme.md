@@ -12,9 +12,15 @@ The project repository was started by @thrize AKA (at)personz on Steemit.
 
 This is a standalone single web page app. Simply enter in a Steemit username and start the analysis.
 
+![](/img/start_form.png)
+
 After posts of the specified user's followers have been scraped of tags, results are displayed.
 
+![](/img/bar_charts.png)
+
 These are arranged by total tag usage, and number of users using tags. They appear separately as bar charts and then combined as a bubble chart in radial projection.
+
+![](/img/bubble_chart.png)
  
 ## Future work
 
