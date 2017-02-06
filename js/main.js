@@ -1,6 +1,6 @@
 
 const
-  FOLLOWERS_FETCH_LIMIT = 400;
+  FOLLOWERS_FETCH_LIMIT = 1000;
 
 var
   NUM_POSTS_TO_SCRAPE = 10,
@@ -13,6 +13,7 @@ var followersTagsTop5 = {};
 var allTags = {};
 var allTagsArray = [];
 var tagsTop5 = {};
+var tagsTop5ByUsers = {};
 
 document.getElementById('input_username').onkeypress = function(e){
   if (!e) e = window.event;
@@ -85,13 +86,14 @@ function beginWithSpecifiedUser() {
             +(err ? "<p>with the following error:</p><p>"+err.message+"</p>" : ""));
           return;
         }
-        addToElement("header_info", "<p>Almost there!</p>");
         addLoadingDiv("Analysing statistics...");
         // generate stats
         console.log("generateAllTags");
         generateAllTags();
         console.log("generateAllTop5Tags");
         generateAllTop5Tags();
+        console.log("generateAllTop5TagsByUsers");
+        generateAllTop5TagsByUsers();
         console.log("generateFollowersTop5");
         generateFollowersTop5();
         // finish
@@ -138,6 +140,33 @@ function generateAllTop5Tags() {
   tagsTop5 = {
     tags: orderedTop5TagNames,
     freqs: orderedTop5TagValues
+  };
+  //console.log("top 5 tags: "+JSON.stringify(tagsTop5));
+}
+
+function generateAllTop5TagsByUsers() {
+  if (allTags == null) {
+    return;
+  }
+  var orderedTop5TagNames = [null, null, null, null, null];
+  var orderedTop5TagValues = [0, 0, 0, 0, 0];
+  for (var tag in allTags) {
+    for (var i = 0 ; i < 5 ; i++) {
+      if (allTags[tag].usernames.length > orderedTop5TagValues[i]) {
+        // shuffle down
+        for (var j = 4 ; j > i ; j--) {
+          orderedTop5TagNames[j] = orderedTop5TagNames[j-1];
+          orderedTop5TagValues[j] = orderedTop5TagValues[j-1];
+        }
+        orderedTop5TagNames[i] = tag;
+        orderedTop5TagValues[i] = allTags[tag].usernames.length;
+        break;
+      }
+    }
+  }
+  tagsTop5ByUsers = {
+    tags: orderedTop5TagNames,
+    num_users: orderedTop5TagValues
   };
   //console.log("top 5 tags: "+JSON.stringify(tagsTop5));
 }
@@ -261,17 +290,24 @@ function getTagsUsedByUser(username, callback) {
 
 function createGraphs() {
   console.log("createTop5Graph");
-  createTop5Graph();
+  //createTop5Graph();
+  console.log("createTopCharts");
+  createTopCharts();
   console.log("createAllTagsGraph");
   createAllTagsGraph();
   console.log("createAllAuthorsGraph");
-  createAllAuthorsGraph();
+  //createAllAuthorsGraph();
 }
 
 function createTop5Graph() {
-  var html_text = "<h3>Top 5 tags</h3><br/>";
+  var html_text = "<h3>Top 5 tags</h3>";
+  html_text += "<br/><h4>By overall usage</h4>";
   for (var i = 0 ; i < 5 ; i++) {
     html_text += "<p><strong>" + tagsTop5.tags[i] + "</strong> used " + tagsTop5.freqs[i] + " times</p>";
+  }
+  html_text += "<br/><h4>By number of users using</h4>";
+  for (var i = 0 ; i < 5 ; i++) {
+    html_text += "<p><strong>" + tagsTop5ByUsers.tags[i] + "</strong> used by " + tagsTop5ByUsers.num_users[i] + " users</p>";
   }
   addDivWithHtml("top_5_tags_text", html_text);
 }
@@ -281,7 +317,7 @@ function createTop5Graph() {
 //    and https://jsfiddle.net/r24e8xd7/9/
 function createAllTagsGraph() {
   var dataset = {children: allTagsArray};
-  addDivWithHtml("all_tags_graph", "<h3>Total tag usage</h3>"
+  addDivWithHtml("all_tags_graph", "<h3>Total tag usage / users using</h3>"
     + "<p>Size indicates tag usage in total</p>"
     + "<p>Color indicates tag usage by users (bluer = more users use tag)</p>", "chart1");
 
@@ -346,6 +382,79 @@ function createAllTagsGraph() {
 
   d3.select(self.frameElement)
     .style("height", diameter + "px");
+}
+
+function createTopCharts() {
+  // tags by freq
+  addDivWithHtml("all_tags_graph", "<h3>Frequency of total usage of tags</h3>"
+    + "<h4>Top 50</h4>"
+    , "chart3");
+  var allTagsArrayByFreq = allTagsArray.sort(function(a, b){ return d3.descending(a.freq, b.freq); });
+  var allTagsArrayByFreqTop = [];
+  for (var i = 0 ; i < 50 && i < allTagsArrayByFreq.length ; i++) {
+    allTagsArrayByFreqTop.push(allTagsArrayByFreq[i]);
+  }
+  createBarChart(allTagsArrayByFreqTop, "chart3", function(d) {return d.freq});
+
+  // tags by users
+  addDivWithHtml("all_tags_graph", "<h3>Number of users using tags</h3>"
+    + "<h4>Top 50</h4>"
+    , "chart4");
+  var allTagsArrayByUsr = allTagsArray.sort(function(a, b){ return d3.descending(a.usernames.length, b.usernames.length); });
+  var allTagsArrayByUsrTop = [];
+  for (var i = 0 ; i < 50 && i < allTagsArrayByUsr.length ; i++) {
+    allTagsArrayByUsrTop.push(allTagsArrayByUsr[i]);
+  }
+  createBarChart(allTagsArrayByUsrTop, "chart4", function(d) {return d.usernames.length});
+}
+
+function createBarChart(data, chartId, getValue) {
+  var margin = {top: 20, right: 20, bottom: 70, left: 40},
+    width = 900 - margin.left - margin.right,
+    height = 300 - margin.top - margin.bottom;
+  var x = d3.scaleBand().range([0, width]).padding(.05);
+  var y = d3.scaleLinear().range([height, 0]);
+  var xAxis = d3.axisBottom()
+    .scale(x);
+  var yAxis = d3.axisLeft()
+    .scale(y)
+    .ticks(10);
+  var svg = d3.select("."+chartId)
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform",
+      "translate(" + margin.left + "," + margin.top + ")");
+
+  x.domain(data.map(function(d) { return d.name; }));
+  y.domain([0, d3.max(data, function(d) { return getValue(d); })]);
+  svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis)
+    .selectAll("text")
+    .style("text-anchor", "end")
+    .attr("dx", "-.8em")
+    .attr("dy", "-.55em")
+    .attr("transform", "rotate(-90)" );
+  svg.append("g")
+    .attr("class", "y axis")
+    .call(yAxis)
+    .append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 6)
+    .attr("dy", ".71em")
+    .style("text-anchor", "end")
+    .text("Value ($)");
+  svg.selectAll("bar")
+    .data(data)
+    .enter().append("rect")
+    .style("fill", "steelblue")
+    .attr("x", function(d) { return x(d.name); })
+    .attr("width", x.bandwidth())
+    .attr("y", function(d) { return y(getValue(d)); })
+    .attr("height", function(d) { return height - y(getValue(d)); });
 }
 
 // modified from example at https://bl.ocks.org/mbostock/4062045
