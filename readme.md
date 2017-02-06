@@ -1,6 +1,6 @@
 # What Tags
 
-A simple web app to show what tags a user uses, and the tags their followers use.
+A simple web app to show what tags the followers of a particular user uses.
 
 Requested by [(at)hexdek16](https://steemit.com/steemit/@hexdek16) on Steemit in [this post](https://steemit.com/steemit/@hexdek16/request-for-a-new-app-program-for-steemit).
 
@@ -8,24 +8,22 @@ Requested by [(at)hexdek16](https://steemit.com/steemit/@hexdek16) on Steemit in
 
 The project repository was started by @thrize AKA (at)personz on Steemit.
 
-### There's nothing here yet!
+## Usage
 
-That's right, the project is currently in **ideation**, no code has been written yet.
+This is a standalone single web page app. Simply enter in a Steemit username and start the analysis.
 
-Please add suggestions, etc., as issues.
+After posts of the specified user's followers have been scraped of tags, results are displayed.
 
-## Proposal
+These are arranged by total tag usage, and number of users using tags. They appear separately as bar charts and then combined as a bubble chart in radial projection.
+ 
+## Future work
 
-Create a frontend only, single webpage app to fetch user data from the Steem network, and analyse the tags used by a specified user's folloers.
+1. Analysis of who uses the same tags as each other, and most importantly with the specified user
+2. Experimental graphing using a [force directed graph](https://bl.ocks.org/mbostock/4062045) (some work already begun in develop branch)
 
-Analysis can include:
+## Licenses and acknowledgements
 
-- For all tags / top 5 tags (switchable)
-  - Total tag usage by network
-  - Who uses the same tags as each other, and most importantly with the specified user
-  - Who has the most tags in common
-
-### Libraries
+### Libraries used
 
 All libraries as local copy
 
@@ -35,30 +33,8 @@ All libraries as local copy
 - [D3js](https://github.com/d3/d3) for charts (not yet used)
 - [loading.css](https://github.com/ConnorAtherton/loaders.css) for loading animations
 
-Note there doesn't need to be any login for this, just type in a username
+### License
 
-### Charting and graphs
+This project is [licensed](/LICENSE) under the Creative Commons CC0 1.0 Universal, which applies to all original programming.
 
-#### Frequency of all tags used
-
-Graphing:
-
-- [hierarchical bar chart](https://bl.ocks.org/mbostock/1283663)
-- [bubble chart](https://bl.ocks.org/mbostock/4063269)
-
-#### Relationships between authors
-
-Graphing:
-
-- [chord diagram](https://bl.ocks.org/mbostock/1046712)
-- [hierarchical edge building](https://bl.ocks.org/mbostock/1044242)
-- [zoomable circle packing](https://bl.ocks.org/mbostock/7607535)
-
-#### More complex charting idea
-
-Take the top 5 tags from every user that you follow, as well as the main user. Make relationships between users using these top 5
-
-Graphing:
-
-- [force directed graph](https://bl.ocks.org/mbostock/4062045)
-- [radial tidy tree](https://bl.ocks.org/mbostock/4063550)
+This means it is free to use, copy and distribute, without restriction.

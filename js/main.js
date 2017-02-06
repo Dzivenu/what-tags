@@ -408,6 +408,8 @@ function createTopCharts() {
   createBarChart(allTagsArrayByUsrTop, "chart4", function(d) {return d.usernames.length});
 }
 
+
+// modified from https://gist.github.com/d3noob/8952219
 function createBarChart(data, chartId, getValue) {
   var margin = {top: 20, right: 20, bottom: 70, left: 40},
     width = 900 - margin.left - margin.right,
