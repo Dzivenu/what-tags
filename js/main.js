@@ -1,6 +1,7 @@
 
 const
-  FOLLOWERS_FETCH_LIMIT = 1000;
+  FOLLOWERS_FETCH_LIMIT = 1000,
+  FOLLOWERS_FETCH_PAGING = 100;
 
 var
   NUM_POSTS_TO_SCRAPE = 10,
@@ -63,16 +64,16 @@ function beginWithSpecifiedUser() {
   }
   addDivWithHtml("header_info", "<h3>@"+username+"</h3>");
   addLoadingDiv("Fetching @"+username+"'s followers...");
-  //steem.api.getDiscussionsByAuthorBeforeDate(username, startPermlink, beforeDate, limit, function(err, response) {
+  steem.api.setWebSocket('wss://steemd.steemit.com');
   followers = [];
-  getFollowers(username, function(err, followersResult) {
+  getFollowers_recursive(username, function(err) {
     removeLoadingDiv();
-    if (err || followersResult == null) {
+    if (err) {
       addErrorDiv("<h3>There has been an error</h3><p>"+err.message+"</p>");
       return;
     }
     // else
-    addToElement("header_info", "<p>Number of followers: "+followers.length + (followersResult.max  ? " or more (fetch limit of "+FOLLOWERS_FETCH_LIMIT+" reached)" : "") +"</p>");
+    addToElement("header_info", "<p>Number of followers: "+followers.length +"</p>");
     if (followers.length > 0) {
       addLoadingDiv("Scrapping tags from up to last "+NUM_POSTS_TO_SCRAPE+" posts of followers, this can take a while...");
       // get each followers tags
@@ -244,17 +245,46 @@ function getFollowersTags_recursive(index, callback) {
   });
 }
 
+// DEPRECATED
 function getFollowers(username, callback) {
   steem.api.getFollowers(username, 0, null, FOLLOWERS_FETCH_LIMIT, function(err, followersResult) {
     if (err || followersResult == null) {
-      callback({message: "error: "+(err != null ? err.message + ", " + JSON.stringify(err.payload) : "null result")}, null);
+      callback({message: "error: "+(err != null ? err.message + ", " + JSON.stringify(err.payload) : "null result")});
     }
     for (var i = 0 ; i < followersResult.length ; i++) {
       if (followersResult[i].what.indexOf('blog') >= 0) {
         followers.push(followersResult[i].follower);
       }
     }
-    callback(null, {max: followersResult.length == FOLLOWERS_FETCH_LIMIT});
+    callback(null);
+  });
+}
+
+function getFollowers_recursive(username, callback) {
+  console.log("getFollowers_recursive");
+  var startFollowerName = followers.length < 1 ? null : followers[followers.length-1];
+  steem.api.getFollowers(username, startFollowerName, null, FOLLOWERS_FETCH_PAGING, function(err, followersResult) {
+    if (err || followersResult == null) {
+      console.log("getFollowers_recursive, error");
+      callback({message: "error: "+(err != null ? err.message + ", " + JSON.stringify(err.payload) : "null result")});
+    }
+    console.log("getFollowers_recursive, got "+followersResult.length+" results");
+    console.log("getFollowers_recursive, followers in result: "+JSON.stringify(followersResult));
+    // skip first username in results if search with name as that will be the first and we already have it from the
+    //    last page
+    for (var i = (startFollowerName == null ? 0 : 1) ; i < followersResult.length ; i++) {
+      if (followersResult[i].what.indexOf('blog') >= 0) {
+        followers.push(followersResult[i].follower);
+      }
+    }
+    console.log("getFollowers_recursive, followers now "+followers.length);
+    if (followersResult.length < FOLLOWERS_FETCH_PAGING) {
+      console.log("getFollowers_recursive, finished");
+      console.log("getFollowers_recursive, followers: "+JSON.stringify(followers));
+      callback(null);
+    } else {
+      getFollowers_recursive(username, callback);
+    }
   });
 }
 
